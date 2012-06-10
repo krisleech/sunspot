@@ -55,29 +55,43 @@ module Sunspot
       def start
         bootstrap
 
-        if File.exist?(pid_path)
-          existing_pid = IO.read(pid_path).to_i
-          begin
-            Process.kill(0, existing_pid)
-            raise(AlreadyRunningError, "Server is already running with PID #{existing_pid}")
-          rescue Errno::ESRCH
-            STDERR.puts("Removing stale PID file at #{pid_path}")
-            FileUtils.rm(pid_path)
-          end
+        command = ['java']
+        command << "-Xms#{min_memory}" if min_memory
+        command << "-Xmx#{max_memory}" if max_memory
+        command << "-Djetty.port=#{port}" if port
+        command << "-Djetty.host=#{bind_address}" if bind_address
+        command << "-Dsolr.data.dir=#{solr_data_dir}" if solr_data_dir
+        command << "-Dsolr.solr.home=#{solr_home}" if solr_home
+        command << "-Djava.util.logging.config.file=#{logging_config_path}" if logging_config_path
+        command << '-jar' << File.basename(solr_jar)
+        FileUtils.cd(File.dirname(solr_jar)) do
+          spoon(Shellwords.shelljoin(command))
         end
-        fork do
-          pid = fork do
-            Process.setsid
-            STDIN.reopen('/dev/null')
-            STDOUT.reopen('/dev/null', 'a')
-            STDERR.reopen(STDOUT)
-            run
-          end
-          FileUtils.mkdir_p(pid_dir)
-          File.open(pid_path, 'w') do |file|
-            file << pid
-          end
-        end
+
+
+        # if File.exist?(pid_path)
+        #   existing_pid = IO.read(pid_path).to_i
+        #   begin
+        #     Process.kill(0, existing_pid)
+        #     raise(AlreadyRunningError, "Server is already running with PID #{existing_pid}")
+        #   rescue Errno::ESRCH
+        #     STDERR.puts("Removing stale PID file at #{pid_path}")
+        #     FileUtils.rm(pid_path)
+        #   end
+        # end
+        # fork do
+        #   pid = fork do
+        #     Process.setsid
+        #     STDIN.reopen('/dev/null')
+        #     STDOUT.reopen('/dev/null', 'a')
+        #     STDERR.reopen(STDOUT)
+        #     run
+        #   end
+        #   FileUtils.mkdir_p(pid_dir)
+        #   File.open(pid_path, 'w') do |file|
+        #     file << pid
+        #   end
+        # end
       end
 
       #
